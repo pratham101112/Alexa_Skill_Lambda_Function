@@ -16,13 +16,13 @@ from ask_sdk_model import Response
 import requests
 import json
 
-
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
+sessionID = None
 
 class LaunchRequestHandler(AbstractRequestHandler):
     """Handler for Skill Launch."""
+
     def can_handle(self, handler_input):
         # type: (HandlerInput) -> bool
 
@@ -30,52 +30,104 @@ class LaunchRequestHandler(AbstractRequestHandler):
 
     def handle(self, handler_input):
         # type: (HandlerInput) -> Response
-        speak_output = "Welcome to Hello World Skill! How can I help you?"
+        speak_output = "Welcome to Jio Eva Skill! How can I help you?"
 
         return (
             handler_input.response_builder
-                .speak(speak_output)
-                .ask(speak_output)
-                .response
+            .speak(speak_output)
+            .ask(speak_output)
+            .response
         )
 
 
-class HelloWorldIntentHandler(AbstractRequestHandler):
+class CreateSessionIntentHandler(AbstractRequestHandler):
     """Handler for Hello World Intent."""
+
     def can_handle(self, handler_input):
         # type: (HandlerInput) -> bool
         # print('entered')
-        return ask_utils.is_intent_name("HelloWorldIntent")(handler_input)
+        return ask_utils.is_intent_name("CreateSession")(handler_input)
 
     def handle(self, handler_input):
+        url = "https://eva-replica.hellojio.jio.com/jiointeract/api/v1/session/create"
+
+        payload = json.dumps({
+            "botName": "EVA Alexa POC",
+            "botId": "bo-f907773e-9730-4167-88ff-4079014f40e8",
+            "clientKey": "s-ea0e0c08-2dd3-4152-bc58-175c5f32603f",
+            "context": "default",
+            "botResponseType": "Text | Audio",
+            "language": "en",
+            "user": {
+                "ani": "7020142110"
+            }
+        })
+        headers = {
+            'Content-Type': 'application/json'
+        }
+
+        res = requests.request("POST", url, headers=headers, data=payload)
+        res = json.loads(res.text)
         print(handler_input.attributes_manager.request_attributes)
         print('entered')
-        data = requests.get("http://api.open-notify.org/astros.json")
-        data = json.loads(data.text)
-        speech_output = f'There are {len(data["people"])} astronauts in space right now.'
-        i = 0
-        while i < len(data["people"]):
-            if i == 0:
-                name = data["people"][i]['name']
-                speech_output = "{} Their names are: {}, ".format(speech_output, name)
-                i += 1
-            elif i == len(data["people"]) - 1:
-                name = data["people"][i]['name']
-                speech_output = "{} and {}.".format(speech_output, name)
-                i += 1
-            else:
-                name = data["people"][i]['name']
-                speech_output = "{} {},".format(speech_output, name)
-                i += 1
+        global sessionID
+        sessionID = res["sessionId"]
+        speech_output = 'Bot connection has been established. Please enter your query'
         return (
             handler_input.response_builder
             .speak(speech_output)
+            .ask(speech_output)
+            .response
+        )
+
+
+class BotQueryIntentHandler(AbstractRequestHandler):
+    """Handler for Hello World Intent."""
+
+    def can_handle(self, handler_input):
+        # type: (HandlerInput) -> bool
+        # print('entered')
+        return ask_utils.is_intent_name("BotQuery")(handler_input)
+
+    def handle(self, handler_input):
+        global sessionID
+        if sessionID is None:
+            speech_output = 'Bot connection has not been established. Please initiate before entering your query'
+            return (
+                handler_input.response_builder
+                .speak(speech_output)
+                .ask(speech_output)
+                .response
+            )
+        url = "https://eva-replica.hellojio.jio.com/jiointeract/api/v2/bot/statement?sessionId" \
+              "=64a3ab3678dce876675877e0_North"
+
+        payload = json.dumps({
+            "query": handler_input.request_envelope.request.intent.slots['UserQuery'].value,
+            "lang": "en",
+            "mode": "Text"
+        })
+        headers = {
+            'Content-Type': 'application/json'
+        }
+
+        res = requests.request("POST", url, headers=headers, data=payload)
+        res = json.loads(res.text)
+        # print(handler_input.attributes_manager.request_attributes)
+        print('entered bot query')
+        text = res["action"]["modes"][0]["textData"]
+        speech_output = text
+        return (
+            handler_input.response_builder
+            .speak(speech_output)
+            .ask(speech_output)
             .response
         )
 
 
 class HelpIntentHandler(AbstractRequestHandler):
     """Handler for Help Intent."""
+
     def can_handle(self, handler_input):
         # type: (HandlerInput) -> bool
         return ask_utils.is_intent_name("AMAZON.HelpIntent")(handler_input)
@@ -86,14 +138,15 @@ class HelpIntentHandler(AbstractRequestHandler):
 
         return (
             handler_input.response_builder
-                .speak(speak_output)
-                .ask(speak_output)
-                .response
+            .speak(speak_output)
+            .ask(speak_output)
+            .response
         )
 
 
 class CancelOrStopIntentHandler(AbstractRequestHandler):
     """Single handler for Cancel and Stop Intent."""
+
     def can_handle(self, handler_input):
         # type: (HandlerInput) -> bool
         return (ask_utils.is_intent_name("AMAZON.CancelIntent")(handler_input) or
@@ -105,12 +158,14 @@ class CancelOrStopIntentHandler(AbstractRequestHandler):
 
         return (
             handler_input.response_builder
-                .speak(speak_output)
-                .response
+            .speak(speak_output)
+            .response
         )
+
 
 class FallbackIntentHandler(AbstractRequestHandler):
     """Single handler for Fallback Intent."""
+
     def can_handle(self, handler_input):
         # type: (HandlerInput) -> bool
         return ask_utils.is_intent_name("AMAZON.FallbackIntent")(handler_input)
@@ -123,8 +178,10 @@ class FallbackIntentHandler(AbstractRequestHandler):
 
         return handler_input.response_builder.speak(speech).ask(reprompt).response
 
+
 class SessionEndedRequestHandler(AbstractRequestHandler):
     """Handler for Session End."""
+
     def can_handle(self, handler_input):
         # type: (HandlerInput) -> bool
         return ask_utils.is_request_type("SessionEndedRequest")(handler_input)
@@ -143,6 +200,7 @@ class IntentReflectorHandler(AbstractRequestHandler):
     for your intents by defining them above, then also adding them to the request
     handler chain below.
     """
+
     def can_handle(self, handler_input):
         # type: (HandlerInput) -> bool
         return ask_utils.is_request_type("IntentRequest")(handler_input)
@@ -154,9 +212,9 @@ class IntentReflectorHandler(AbstractRequestHandler):
 
         return (
             handler_input.response_builder
-                .speak(speak_output)
-                # .ask("add a reprompt if you want to keep the session open for the user to respond")
-                .response
+            .speak(speak_output)
+            # .ask("add a reprompt if you want to keep the session open for the user to respond")
+            .response
         )
 
 
@@ -165,6 +223,7 @@ class CatchAllExceptionHandler(AbstractExceptionHandler):
     stating the request handler chain is not found, you have not implemented a handler for
     the intent being invoked or included it in the skill builder below.
     """
+
     def can_handle(self, handler_input, exception):
         # type: (HandlerInput, Exception) -> bool
         return True
@@ -177,10 +236,11 @@ class CatchAllExceptionHandler(AbstractExceptionHandler):
 
         return (
             handler_input.response_builder
-                .speak(speak_output)
-                .ask(speak_output)
-                .response
+            .speak(speak_output)
+            .ask(speak_output)
+            .response
         )
+
 
 # The SkillBuilder object acts as the entry point for your skill, routing all request and response
 # payloads to the handlers above. Make sure any new handlers or interceptors you've
@@ -190,18 +250,20 @@ class CatchAllExceptionHandler(AbstractExceptionHandler):
 sb = SkillBuilder()
 
 sb.add_request_handler(LaunchRequestHandler())
-sb.add_request_handler(HelloWorldIntentHandler())
+sb.add_request_handler(CreateSessionIntentHandler())
+sb.add_request_handler(BotQueryIntentHandler())
 sb.add_request_handler(HelpIntentHandler())
 sb.add_request_handler(CancelOrStopIntentHandler())
 sb.add_request_handler(FallbackIntentHandler())
 sb.add_request_handler(SessionEndedRequestHandler())
-sb.add_request_handler(IntentReflectorHandler()) # make sure IntentReflectorHandler is last so it doesn't override your custom intent handlers
+sb.add_request_handler(
+    IntentReflectorHandler())  # make sure IntentReflectorHandler is last so it doesn't override your custom intent handlers
 
 sb.add_exception_handler(CatchAllExceptionHandler())
 
 lambda_handler = sb.lambda_handler()
 
-# with open('input.json', 'r') as file:
-#     json_data = json.load(file)
-# response = lambda_handler(json_data, None)
-# print(response)
+with open('input.json', 'r') as file:
+    json_data = json.load(file)
+response = lambda_handler(json_data, None)
+print(response)
