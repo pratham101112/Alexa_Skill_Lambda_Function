@@ -18,7 +18,13 @@ import json
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-sessionID = None
+sessionID = "64a645bcdb197c244225f63c_North"
+botID = 'bo-f907773e-9730-4167-88ff-4079014f40e8'
+clientKey = 's-ea0e0c08-2dd3-4152-bc58-175c5f32603f'
+botName = 'EVA Alexa POC'
+botID1 = 'bo-f907773e-9730-4167-88ff-4079014f40e8'
+clientKey1 = 's-ea0e0c08-2dd3-4152-bc58-175c5f32603f'
+botName1 = 'EVA Alexa POC'
 
 class LaunchRequestHandler(AbstractRequestHandler):
     """Handler for Skill Launch."""
@@ -30,7 +36,7 @@ class LaunchRequestHandler(AbstractRequestHandler):
 
     def handle(self, handler_input):
         # type: (HandlerInput) -> Response
-        speak_output = "Welcome to Jio Eva Skill! How can I help you?"
+        speak_output = "Welcome to Hello World Skill! How can I help you?"
 
         return (
             handler_input.response_builder
@@ -50,11 +56,20 @@ class CreateSessionIntentHandler(AbstractRequestHandler):
 
     def handle(self, handler_input):
         url = "https://eva-replica.hellojio.jio.com/jiointeract/api/v1/session/create"
-
+        global botName
+        global botID
+        global clientKey
+        # bn = handler_input.request_envelope.request.intent.slots['BotName'].resolutions.resolutions_per_authority[0].values[0].value.name
+        # bid = handler_input.request_envelope.request.intent.slots['BotID'].resolutions.resolutions_per_authority[0].values[0].value.name
+        # if bn is not None and bid is not None:
+        #     botName = bn
+        #     botID = bid
+        # print(f'bot name : {bn} {botName1}')
+        # print(f'bot id : {bid} {botID1}')
         payload = json.dumps({
-            "botName": "EVA Alexa POC",
-            "botId": "bo-f907773e-9730-4167-88ff-4079014f40e8",
-            "clientKey": "s-ea0e0c08-2dd3-4152-bc58-175c5f32603f",
+            "botName": botName1,
+            "botId": botID,
+            "clientKey": clientKey,
             "context": "default",
             "botResponseType": "Text | Audio",
             "language": "en",
@@ -81,6 +96,44 @@ class CreateSessionIntentHandler(AbstractRequestHandler):
         )
 
 
+class EndSessionIntentHandler(AbstractRequestHandler):
+    """Handler for Hello World Intent."""
+
+    def can_handle(self, handler_input):
+        # type: (HandlerInput) -> bool
+        # print('entered')
+        return ask_utils.is_intent_name("EndSession")(handler_input)
+
+    def handle(self, handler_input):
+        global sessionID
+        if sessionID is None:
+            speech_output = 'No session is active. Kindly start the session before ending it.'
+            return (
+                handler_input.response_builder
+                .speak(speech_output)
+                .ask(speech_output)
+                .response
+            )
+
+        url = f"https://eva-replica.hellojio.jio.com/jiointeract/api/v1/session/end?sessionId={sessionID}"
+
+        payload = ""
+        headers = {}
+
+        res = requests.request("POST", url, headers=headers, data=payload)
+        res = json.loads(res.text)
+        print(handler_input.attributes_manager.request_attributes)
+        print('entered')
+        speech_output = res["message"]
+        return (
+            handler_input.response_builder
+            .speak(speech_output)
+            .ask(speech_output)
+            .response
+        )
+
+
+
 class BotQueryIntentHandler(AbstractRequestHandler):
     """Handler for Hello World Intent."""
 
@@ -99,8 +152,8 @@ class BotQueryIntentHandler(AbstractRequestHandler):
                 .ask(speech_output)
                 .response
             )
-        url = "https://eva-replica.hellojio.jio.com/jiointeract/api/v2/bot/statement?sessionId" \
-              "=64a3ab3678dce876675877e0_North"
+        url = f"https://eva-replica.hellojio.jio.com/jiointeract/api/v2/bot/statement?sessionId" \
+              f"={sessionID}"
 
         payload = json.dumps({
             "query": handler_input.request_envelope.request.intent.slots['UserQuery'].value,
@@ -115,6 +168,7 @@ class BotQueryIntentHandler(AbstractRequestHandler):
         res = json.loads(res.text)
         # print(handler_input.attributes_manager.request_attributes)
         print('entered bot query')
+        print(res)
         text = res["action"]["modes"][0]["textData"]
         speech_output = text
         return (
@@ -252,6 +306,7 @@ sb = SkillBuilder()
 sb.add_request_handler(LaunchRequestHandler())
 sb.add_request_handler(CreateSessionIntentHandler())
 sb.add_request_handler(BotQueryIntentHandler())
+sb.add_request_handler(EndSessionIntentHandler())
 sb.add_request_handler(HelpIntentHandler())
 sb.add_request_handler(CancelOrStopIntentHandler())
 sb.add_request_handler(FallbackIntentHandler())
