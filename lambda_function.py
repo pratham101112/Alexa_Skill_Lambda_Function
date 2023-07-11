@@ -39,7 +39,7 @@ class LaunchRequestHandler(AbstractRequestHandler):
 
     def handle(self, handler_input):
         # type: (HandlerInput) -> Response
-        speak_output = "Welcome to Jio EVA Skill! How can I help you?"
+        speak_output = "Welcome to Jio Eva Skill! How can I help you?"
         url = "https://eva-replica.hellojio.jio.com/jiointeract/api/v1/session/create"
         global botName
         global botID
@@ -200,35 +200,42 @@ class BotQueryIntentHandler(AbstractRequestHandler):
         
         res = requests.request("POST", url, headers=headers, data=payload)
         res = json.loads(res.text)
-        intent = res["action"]["intent"]
-        # mp3_url = "https://hellojiodiag.blob.core.windows.net/eva/SIT/EVA-Enterprise/up-173d1ee2-b452-4992-9c6c-82b67e1777fc.mp3?type=audio/mpeg"
-        mp3_url = create_presigned_url(f"Media/{intent}.mp3")
-        mp3_url = mp3_url.replace('&', '&amp;')
-        # mp3_url = 'soundbank://soundlibrary/water/nature/nature_08'
-        # te = 'Response played'
-        speech_output = ("<audio src=\"{}\"></audio>").format(mp3_url)
-        display_text = res["action"]["modes"][1]["textData"]
-
-        apl_document = {
-                          "type": "APL",
-                          "version": "2023.1",
-                          "mainTemplate": {
-                            "item": {
-                              "type": "Text",
-                              "text": display_text,
-                              "fontSize": "30px",
-                              "fontStyle" : "italic",
-                              "color" : "beige"
+        if "gender" not in res["action"]["modes"][0]["varResponse"][0]:
+            intent = res["action"]["intent"]
+            # mp3_url = "https://hellojiodiag.blob.core.windows.net/eva/SIT/EVA-Enterprise/up-173d1ee2-b452-4992-9c6c-82b67e1777fc.mp3?type=audio/mpeg"
+            mp3_url = create_presigned_url(f"Media/{intent}.mp3")
+            mp3_url = mp3_url.replace('&', '&amp;')
+            # mp3_url = 'soundbank://soundlibrary/water/nature/nature_08'
+            # te = 'Response played'
+            speech_output = ("<audio src=\"{}\"></audio>").format(mp3_url)
+            display_text = res["action"]["modes"][1]["textData"]
+            apl_document = {
+                              "type": "APL",
+                              "version": "2023.1",
+                              "mainTemplate": {
+                                "item": {
+                                  "type": "Text",
+                                  "text": display_text,
+                                  "fontSize": "30px",
+                                  "fontStyle" : "italic",
+                                  "color" : "beige"
+                                }
+                              }
                             }
-                          }
-                        }
-        directive = RenderDocumentDirective(
-            token="new_token", document=apl_document)
-
-        handler_input.response_builder.add_directive(directive)
-        handler_input.response_builder.speak(speech_output)
-
-        return handler_input.response_builder.response
+            directive = RenderDocumentDirective(
+                token="new_token", document=apl_document)
+            handler_input.response_builder.add_directive(directive)
+            handler_input.response_builder.speak(speech_output)
+            return handler_input.response_builder.response
+        else:
+            text = res["action"]["modes"][1]["textData"]
+            speech_output = text
+            return (
+                handler_input.response_builder
+                .speak(speech_output)
+                .ask(speech_output)
+                .response
+            )
         # return (
         #     handler_input.response_builder
         #     .speak(speech_output)
