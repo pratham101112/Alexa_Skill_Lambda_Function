@@ -1,24 +1,27 @@
 # -*- coding: utf-8 -*-
-
 # This sample demonstrates handling intents from an Alexa skill using the Alexa Skills Kit SDK for Python.
 # Please visit https://alexa.design/cookbook for additional examples on implementing slots, dialog management,
 # session persistence, api calls, and more.
 # This sample is built using the handler classes approach in skill builder.
 import logging
 import ask_sdk_core.utils as ask_utils
-
+import os
 from ask_sdk_core.skill_builder import SkillBuilder
 from ask_sdk_core.dispatch_components import AbstractRequestHandler
 from ask_sdk_core.dispatch_components import AbstractExceptionHandler
 from ask_sdk_core.handler_input import HandlerInput
-
+from ask_sdk_model import ui
+from ask_sdk_model.interfaces.audioplayer import PlayDirective, PlayBehavior, AudioItem, Stream
+from ask_sdk_model.interfaces.alexa.presentation.apl import RenderDocumentDirective
+from utils import create_presigned_url
 from ask_sdk_model import Response
 import requests
 import json
 
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-sessionID = "64a645bcdb197c244225f63c_North"
+sessionID = None
 botID = 'bo-f907773e-9730-4167-88ff-4079014f40e8'
 clientKey = 's-ea0e0c08-2dd3-4152-bc58-175c5f32603f'
 botName = 'EVA Alexa POC'
@@ -37,7 +40,38 @@ class LaunchRequestHandler(AbstractRequestHandler):
     def handle(self, handler_input):
         # type: (HandlerInput) -> Response
         speak_output = "Welcome to Hello World Skill! How can I help you?"
+        url = "https://eva-replica.hellojio.jio.com/jiointeract/api/v1/session/create"
+        global botName
+        global botID
+        global clientKey
+        # bn = handler_input.request_envelope.request.intent.slots['BotName'].resolutions.resolutions_per_authority[0].values[0].value.name
+        # bid = handler_input.request_envelope.request.intent.slots['BotID'].resolutions.resolutions_per_authority[0].values[0].value.name
+        # if bn is not None and bid is not None:
+        #     botName = bn
+        #     botID = bid
+        # print(f'bot name : {bn} {botName1}')
+        # print(f'bot id : {bid} {botID1}')
+        payload = json.dumps({
+            "botName": botName1,
+            "botId": botID,
+            "clientKey": clientKey,
+            "context": "default",
+            "botResponseType": "Text | Audio",
+            "language": "en",
+            "user": {
+                "ani": "7020142110"
+            }
+        })
+        headers = {
+            'Content-Type': 'application/json'
+        }
 
+        res = requests.request("POST", url, headers=headers, data=payload)
+        res = json.loads(res.text)
+        print(handler_input.attributes_manager.request_attributes)
+        print('entered')
+        global sessionID
+        sessionID = res["sessionId"]
         return (
             handler_input.response_builder
             .speak(speak_output)
@@ -154,29 +188,104 @@ class BotQueryIntentHandler(AbstractRequestHandler):
             )
         url = f"https://eva-replica.hellojio.jio.com/jiointeract/api/v2/bot/statement?sessionId" \
               f"={sessionID}"
-
+        
         payload = json.dumps({
             "query": handler_input.request_envelope.request.intent.slots['UserQuery'].value,
             "lang": "en",
-            "mode": "Text"
+            "mode": "Audio"
         })
         headers = {
             'Content-Type': 'application/json'
         }
-
+        
         res = requests.request("POST", url, headers=headers, data=payload)
         res = json.loads(res.text)
-        # print(handler_input.attributes_manager.request_attributes)
-        print('entered bot query')
-        print(res)
-        text = res["action"]["modes"][0]["textData"]
-        speech_output = text
-        return (
-            handler_input.response_builder
-            .speak(speech_output)
-            .ask(speech_output)
-            .response
-        )
+        intent = res["action"]["intent"]
+        # mp3_url = "https://hellojiodiag.blob.core.windows.net/eva/SIT/EVA-Enterprise/up-173d1ee2-b452-4992-9c6c-82b67e1777fc.mp3?type=audio/mpeg"
+        mp3_url = create_presigned_url(f"Media/{intent}.mp3")
+        mp3_url = mp3_url.replace('&', '&amp;')
+        # mp3_url = 'soundbank://soundlibrary/water/nature/nature_08'
+        # te = 'Response played'
+        speech_output = ("<audio src=\"{}\"></audio>").format(mp3_url)
+        display_text = res["action"]["modes"][1]["textData"]
+
+        apl_document = {
+                          "type": "APL",
+                          "version": "2023.1",
+                          "mainTemplate": {
+                            "item": {
+                              "type": "Text",
+                              "text": display_text,
+                              "fontSize": "30px",
+                              "fontStyle" : "italic",
+                              "color" : "beige"
+                            }
+                          }
+                        }
+        directive = RenderDocumentDirective(
+            token="new_token", document=apl_document)
+
+        handler_input.response_builder.add_directive(directive)
+        handler_input.response_builder.speak(speech_output)
+
+        return handler_input.response_builder.response
+        # return (
+        #     handler_input.response_builder
+        #     .speak(speech_output)
+        #     .ask(speech_output)
+        #     .set_card(ui.SimpleCard(title="Visual Response", content=display_text))
+        #     .response
+        #     )
+        # response = {
+        #     'version': '1.0',
+        #     'response': {
+        #         'directives': [
+        #             {
+        #                 'type': 'AudioPlayer.Play',
+        #                 'playBehavior': 'REPLACE_ALL',
+        #                 'audioItem': {
+        #                     'stream': {
+        #                         'token': 'unique_token',
+        #                         'url': mp3_url,
+        #                         'offsetInMilliseconds': 0
+        #                     }
+        #                 }
+        #             }
+        #         ],
+        #         'shouldEndSession': False
+        #     }
+        # }
+
+        # return {
+        #     'statusCode': 200,
+        #     'body': json.dumps(response)
+        # }
+
+        # url = f"https://eva-replica.hellojio.jio.com/jiointeract/api/v2/bot/statement?sessionId" \
+        #       f"={sessionID}"
+        #
+        # payload = json.dumps({
+        #     "query": handler_input.request_envelope.request.intent.slots['UserQuery'].value,
+        #     "lang": "en",
+        #     "mode": "Text"
+        # })
+        # headers = {
+        #     'Content-Type': 'application/json'
+        # }
+        #
+        # res = requests.request("POST", url, headers=headers, data=payload)
+        # res = json.loads(res.text)
+        # # print(handler_input.attributes_manager.request_attributes)
+        # print('entered bot query')
+        # print(res)
+        # text = res["action"]["modes"][0]["textData"]
+        # speech_output = text
+        # return (
+        #     handler_input.response_builder
+        #     .speak(speech_output)
+        #     .ask(speech_output)
+        #     .response
+        # )
 
 
 class HelpIntentHandler(AbstractRequestHandler):
@@ -318,7 +427,8 @@ sb.add_exception_handler(CatchAllExceptionHandler())
 
 lambda_handler = sb.lambda_handler()
 
-with open('input.json', 'r') as file:
-    json_data = json.load(file)
-response = lambda_handler(json_data, None)
-print(response)
+# with open('input.json', 'r') as file:
+#     json_data = json.load(file)
+# response = lambda_handler(json_data, None)
+# print(response)
+
