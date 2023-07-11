@@ -39,7 +39,7 @@ class LaunchRequestHandler(AbstractRequestHandler):
 
     def handle(self, handler_input):
         # type: (HandlerInput) -> Response
-        speak_output = "Welcome to Hello World Skill! How can I help you?"
+        speak_output = "Welcome to Jio EVA Skill! How can I help you?"
         url = "https://eva-replica.hellojio.jio.com/jiointeract/api/v1/session/create"
         global botName
         global botID
