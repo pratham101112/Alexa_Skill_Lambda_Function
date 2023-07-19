@@ -1,8 +1,4 @@
-# -*- coding: utf-8 -*-
-# This sample demonstrates handling intents from an Alexa skill using the Alexa Skills Kit SDK for Python.
-# Please visit https://alexa.design/cookbook for additional examples on implementing slots, dialog management,
-# session persistence, api calls, and more.
-# This sample is built using the handler classes approach in skill builder.
+
 import logging
 import ask_sdk_core.utils as ask_utils
 import os
@@ -17,8 +13,9 @@ from utils import create_presigned_url
 from ask_sdk_model import Response
 import requests
 import json
-
-
+import boto3
+import io
+from gtts import gTTS
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 sessionID = None
@@ -158,14 +155,13 @@ class EndSessionIntentHandler(AbstractRequestHandler):
         res = json.loads(res.text)
         print(handler_input.attributes_manager.request_attributes)
         print('entered')
-        speech_output = res["message"]
+        speech_output = "Eva Bot says goodbye."
         return (
             handler_input.response_builder
             .speak(speech_output)
             .ask(speech_output)
             .response
         )
-
 
 
 class BotQueryIntentHandler(AbstractRequestHandler):
@@ -228,71 +224,33 @@ class BotQueryIntentHandler(AbstractRequestHandler):
             handler_input.response_builder.speak(speech_output)
             return handler_input.response_builder.response
         else:
-            text = res["action"]["modes"][1]["textData"]
-            speech_output = text
-            return (
-                handler_input.response_builder
-                .speak(speech_output)
-                .ask(speech_output)
-                .response
-            )
-        # return (
-        #     handler_input.response_builder
-        #     .speak(speech_output)
-        #     .ask(speech_output)
-        #     .set_card(ui.SimpleCard(title="Visual Response", content=display_text))
-        #     .response
-        #     )
-        # response = {
-        #     'version': '1.0',
-        #     'response': {
-        #         'directives': [
-        #             {
-        #                 'type': 'AudioPlayer.Play',
-        #                 'playBehavior': 'REPLACE_ALL',
-        #                 'audioItem': {
-        #                     'stream': {
-        #                         'token': 'unique_token',
-        #                         'url': mp3_url,
-        #                         'offsetInMilliseconds': 0
-        #                     }
-        #                 }
-        #             }
-        #         ],
-        #         'shouldEndSession': False
-        #     }
-        # }
+            intent = res["action"]["intent"]
+            # mp3_url = "https://hellojiodiag.blob.core.windows.net/eva/SIT/EVA-Enterprise/up-173d1ee2-b452-4992-9c6c-82b67e1777fc.mp3?type=audio/mpeg"
+            mp3_url = create_presigned_url(f"Media/{intent}.mp3")
+            mp3_url = mp3_url.replace('&', '&amp;')
+            # mp3_url = 'soundbank://soundlibrary/water/nature/nature_08'
+            # te = 'Response played'
+            speech_output = ("<audio src=\"{}\"></audio>").format(mp3_url)
+            display_text = res["action"]["modes"][1]["textData"]
+            apl_document = {
+                              "type": "APL",
+                              "version": "2023.1",
+                              "mainTemplate": {
+                                "item": {
+                                  "type": "Text",
+                                  "text": display_text,
+                                  "fontSize": "30px",
+                                  "fontStyle" : "italic",
+                                  "color" : "beige"
+                                }
+                              }
+                            }
+            directive = RenderDocumentDirective(
+                token="new_token", document=apl_document)
+            handler_input.response_builder.add_directive(directive)
+            handler_input.response_builder.speak(speech_output)
+            return handler_input.response_builder.response
 
-        # return {
-        #     'statusCode': 200,
-        #     'body': json.dumps(response)
-        # }
-
-        # url = f"https://eva-replica.hellojio.jio.com/jiointeract/api/v2/bot/statement?sessionId" \
-        #       f"={sessionID}"
-        #
-        # payload = json.dumps({
-        #     "query": handler_input.request_envelope.request.intent.slots['UserQuery'].value,
-        #     "lang": "en",
-        #     "mode": "Text"
-        # })
-        # headers = {
-        #     'Content-Type': 'application/json'
-        # }
-        #
-        # res = requests.request("POST", url, headers=headers, data=payload)
-        # res = json.loads(res.text)
-        # # print(handler_input.attributes_manager.request_attributes)
-        # print('entered bot query')
-        # print(res)
-        # text = res["action"]["modes"][0]["textData"]
-        # speech_output = text
-        # return (
-        #     handler_input.response_builder
-        #     .speak(speech_output)
-        #     .ask(speech_output)
-        #     .response
-        # )
 
 
 class HelpIntentHandler(AbstractRequestHandler):
@@ -412,10 +370,6 @@ class CatchAllExceptionHandler(AbstractExceptionHandler):
         )
 
 
-# The SkillBuilder object acts as the entry point for your skill, routing all request and response
-# payloads to the handlers above. Make sure any new handlers or interceptors you've
-# defined are included below. The order matters - they're processed top to bottom.
-
 
 sb = SkillBuilder()
 
@@ -428,14 +382,10 @@ sb.add_request_handler(CancelOrStopIntentHandler())
 sb.add_request_handler(FallbackIntentHandler())
 sb.add_request_handler(SessionEndedRequestHandler())
 sb.add_request_handler(
-    IntentReflectorHandler())  # make sure IntentReflectorHandler is last so it doesn't override your custom intent handlers
+    IntentReflectorHandler())
 
 sb.add_exception_handler(CatchAllExceptionHandler())
 
 lambda_handler = sb.lambda_handler()
 
-# with open('input.json', 'r') as file:
-#     json_data = json.load(file)
-# response = lambda_handler(json_data, None)
-# print(response)
 
